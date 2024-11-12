@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.4
+    container_name: postgres-sqlcoder
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sqlcoder-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      PG_DB: llm_demo
+      OLLAMA_HOST: http://host.docker.internal:11434
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      sh -c "
+        echo 'Waiting for database to initialize...' &&
+        sleep 5 &&
+        echo 'Checking if test cases need to be initialized...' &&
+        if [ $$(PGPASSWORD=${PG_PASSWORD:-postgres} psql -h postgres -U ${PG_USER:-postgres} -d llm_demo -t -c 'SELECT COUNT(*) FROM test_cases;' | tr -d '[:space:]') -eq '0' ]; then
+          echo 'Initializing test cases...' &&
+          PGPASSWORD=${PG_PASSWORD:-postgres} psql -h postgres -U ${PG_USER:-postgres} -d llm_demo -f /app/db/test-cases.sql &&
+          echo 'Test cases initialized.';
+        else
+          echo 'Test cases already exist, skipping initialization.';
+        fi &&
+        node dist/main"
+
+volumes:
+  postgres_data: 

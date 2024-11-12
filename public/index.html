@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQL LLM Интерфейс</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0 auto; max-width: 900px; padding: 24px; }
+    textarea, input, select { width: 100%; padding: 8px; margin: 6px 0; }
+    button { padding: 8px 16px; margin-right: 8px; cursor: pointer; }
+    .btn-green { background:#4CAF50; color:#fff; border:none; }
+    .btn-blue  { background:#008CBA; color:#fff; border:none; }
+    .result-box, #testReport { border:1px solid #ddd; padding:10px; white-space:pre-wrap; margin-top:12px;}
+    table { border-collapse: collapse; width: 100%; margin-top:10px;}
+    th, td { border: 1px solid #ddd; padding: 4px 6px; }
+    th { background:#f4f4f4; }
+    .ok { color:green; font-weight:bold; }
+    .fail { color:red; font-weight:bold; }
+    .test-cases-container { margin-top: 30px; }
+    .domain-heading { margin-top: 20px; margin-bottom: 10px; background: #f0f0f0; padding: 5px; }
+    .sql-code { font-family: monospace; max-height: 120px; overflow-y: auto; background: #f7f7f7; padding: 4px; }
+    .filter-controls { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>SQL LLM Интерфейс</h1>
+
+  <!-- ручной режим -->
+  <h3>Введите ваш запрос:</h3>
+  <select id="domainInput">
+    <option value="video">Видео</option>
+    <option value="messenger">Мессенджер</option>
+    <option value="delivery">Доставка</option>
+  </select>
+  <textarea id="queryInput" placeholder="например: покажи все видео"></textarea>
+
+  <button class="btn-green" onclick="submitQuery(true)">Сгенерировать SQL</button>
+
+  <div id="result" class="result-box">Результаты появятся здесь...</div>
+
+  <hr />
+
+  <!-- автотесты -->
+  <h3>Автоматизированные тесты</h3>
+  <button class="btn-blue" id="runTestsBtn">Запустить все тесты</button>
+  <div id="testReport"></div>
+
+  <hr />
+
+  <!-- список всех тест кейсов -->
+  <h3>Тестовые случаи</h3>
+  <div class="filter-controls">
+    <label>Фильтр по домену:
+      <select id="domainFilter">
+        <option value="all">Все домены</option>
+        <option value="video">Видео</option>
+        <option value="messenger">Мессенджер</option>
+        <option value="delivery">Доставка</option>
+      </select>
+    </label>
+  </div>
+  <div id="testCasesContainer" class="test-cases-container">Загрузка тестовых случаев...</div>
+
+<script>
+/* ---------- ручной запрос ---------- */
+async function submitQuery(useStream = false) {
+  const query = document.getElementById('queryInput').value.trim();
+  const domain = document.getElementById('domainInput').value;
+  const out = document.getElementById('result');
+
+  if (!query) { out.textContent = 'Пожалуйста, введите запрос'; return; }
+  out.textContent = 'Обработка...';
+
+  const url = useStream ? '/generate-sql-stream' : '/generate-sql';
+  const resp = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ query, domain })
+  });
+
+  if (useStream) {
+    const reader = resp.body.getReader();
+    let acc='';
+    while(true){
+      const { done, value } = await reader.read();
+      if(done) break;
+      const chunk = new TextDecoder().decode(value);
+      try { acc += JSON.parse(chunk).response; } catch(e){ console.error(e); }
+      out.textContent = acc;
+    }
+  } else {
+    const data = await resp.json();
+    out.textContent = data.sql || data.error || 'Результат не получен';
+  }
+}
+
+/* ---------- автотесты ---------- */
+document.getElementById('runTestsBtn').addEventListener('click', async () => {
+  const reportBox = document.getElementById('testReport');
+  reportBox.innerHTML = 'Выполнение тестов, пожалуйста, подождите...';
+
+  const resp = await fetch('/api/test-runner/run', { method:'POST' });
+  const report = await resp.json();
+
+  let html = `<p><strong>Пройдено ${report.passed} / ${report.total}</strong></p>`;
+  html += '<table><tr><th>ID</th><th>Вопрос</th><th>SQL верный?</th><th>Результат совпадает?</th><th>Время (мс)</th></tr>';
+  for(const r of report.results){
+    html += `<tr>
+      <td>${r.testId}</td>
+      <td>${r.question}</td>
+      <td class="${r.isSqlCorrect?'ok':'fail'}">${r.isSqlCorrect?'✔':'✘'}</td>
+      <td class="${r.isResultMatch?'ok':'fail'}">${r.isResultMatch?'✔':'✘'}</td>
+      <td>${r.generationTimeMs}</td>
+    </tr>`;
+  }
+  html += '</table>';
+  reportBox.innerHTML = html;
+});
+
+/* ---------- отображение тест кейсов ---------- */
+document.addEventListener('DOMContentLoaded', async () => {
+  const domainFilter = document.getElementById('domainFilter');
+  await loadTestCases();
+  
+  // Обработчик фильтрации
+  domainFilter.addEventListener('change', async () => {
+    await loadTestCases(domainFilter.value);
+  });
+});
+
+async function loadTestCases(domainFilter = 'all') {
+  const container = document.getElementById('testCasesContainer');
+  container.innerHTML = 'Загрузка тестовых случаев...';
+  
+  try {
+    const response = await fetch('/api/test-runner/test-cases');
+    if (!response.ok) {
+      throw new Error('Не удалось загрузить тестовые случаи');
+    }
+    
+    const testCases = await response.json();
+    
+    // Группировка тест кейсов по домену
+    const groupedTestCases = {};
+    testCases.forEach(tc => {
+      if (!groupedTestCases[tc.domain]) {
+        groupedTestCases[tc.domain] = [];
+      }
+      groupedTestCases[tc.domain].push(tc);
+    });
+    
+    let html = '';
+    
+    // Отображение для каждого домена (или только выбранного)
+    Object.keys(groupedTestCases).sort().forEach(domain => {
+      if (domainFilter !== 'all' && domain !== domainFilter) {
+        return;
+      }
+      
+      const domainName = {
+        'video': 'ВИДЕО',
+        'messenger': 'МЕССЕНДЖЕР',
+        'delivery': 'ДОСТАВКА'
+      }[domain] || domain.toUpperCase();
+      
+      html += `<h4 class="domain-heading">Домен: ${domainName}</h4>`;
+      html += '<table>';
+      html += '<tr><th>ID</th><th>Вопрос</th><th>SQL</th></tr>';
+      
+      groupedTestCases[domain].forEach(tc => {
+        html += `<tr>
+          <td>${tc.id}</td>
+          <td>${tc.naturalLanguage}</td>
+          <td class="sql-code">${tc.referenceSql}</td>
+        </tr>`;
+      });
+      
+      html += '</table>';
+    });
+    
+    if (html === '') {
+      html = '<p>Тестовые случаи для выбранного фильтра не найдены.</p>';
+    }
+    
+    container.innerHTML = html;
+  } catch (error) {
+    container.innerHTML = `<p>Ошибка загрузки тестовых случаев: ${error.message}</p>`;
+    console.error('Error loading test cases:', error);
+  }
+}
+</script>
+</body>
+</html>
