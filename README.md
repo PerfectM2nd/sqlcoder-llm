@@ -98,77 +98,193 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
-# SQLCoder LLM with NestJS
+# SQLCoder LLM with NestJS & React Frontend
 
-A NestJS application that uses Ollama with SQLCoder model to convert natural language to SQL queries.
+A full-stack application that uses Ollama with SQLCoder model to convert natural language to SQL queries. Features a modern React frontend built with shadcn/ui components and a NestJS backend.
+
+## Architecture
+
+- **Backend**: NestJS with TypeScript
+- **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS + shadcn/ui
+- **Database**: PostgreSQL with PostGIS
+- **AI Model**: Ollama with SQLCoder
+- **Deployment**: Docker Compose
 
 ## Prerequisites
 
-- Node.js (v20+)
-- Yarn
+- Node.js (v18+)
+- Yarn or npm
 - PostgreSQL
 - Ollama (with SQLCoder model)
+- Docker & Docker Compose (for containerized deployment)
 
-## Setup Environment
-
-1. Install PostgreSQL on your local machine
-2. Install Ollama from [https://ollama.ai/](https://ollama.ai/)
-3. Create a `.env` file in the root directory with the following content:
+## Project Structure
 
 ```
-# Database configuration
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=postgres_sqlcoder
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-
-# Ollama configuration
-OLLAMA_HOST=localhost
-OLLAMA_PORT=11434
+sqlcoder-llm/
+├── src/                    # NestJS backend source
+├── frontend/               # React frontend application
+│   ├── src/
+│   │   ├── components/ui/  # shadcn/ui components
+│   │   ├── lib/           # Utility functions
+│   │   └── App.tsx        # Main application
+│   ├── Dockerfile         # Frontend Docker configuration
+│   └── nginx.conf         # Nginx configuration for production
+├── db/                    # Database scripts and migrations
+├── docker-compose.yml     # Multi-service Docker setup
+└── Dockerfile            # Backend Docker configuration
 ```
 
-## Running the Application
+## Development Setup
 
-This project includes a Makefile to simplify running the application natively:
-
-```bash
-# Install dependencies
-make install
-
-# Start the database, Ollama with SQLCoder model, and the application
-make start-app
-
-# Clean up
-make clean
-```
-
-### Manual Steps
-
-If you prefer to run commands manually:
+### Backend
 
 1. Install dependencies:
 ```bash
 yarn install
 ```
 
-2. Start PostgreSQL and create the database:
-```bash
-createdb postgres_sqlcoder
-# Run SQL scripts from db/ directory
+2. Create a `.env` file:
+```env
+# Database configuration
+PG_USER=postgres
+PG_PASSWORD=postgres
+PG_DB=llm_demo
+PG_HOST=localhost
+PG_PORT=5432
+
+# Ollama configuration
+OLLAMA_HOST=http://localhost:11434
 ```
 
-3. Start Ollama and pull the SQLCoder model:
-```bash
-ollama serve
-ollama pull sqlcoder:7b
-```
-
-4. Start the NestJS application:
+3. Start the backend:
 ```bash
 yarn start:dev
 ```
 
-## API Usage
+### Frontend
 
-The application exposes a web interface at http://localhost:3000 and an API endpoint at `/generate-sql` for converting natural language queries to SQL.
+1. Navigate to frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173` and will proxy API requests to the backend at `http://localhost:3000`.
+
+## Production Deployment
+
+### Using Docker Compose
+
+1. Start all services:
+```bash
+docker-compose up -d
+```
+
+This will start:
+- PostgreSQL database on port 5432
+- NestJS backend on port 3000
+- React frontend on port 3003
+
+2. Access the application at `http://localhost:3003`
+
+### Manual Deployment
+
+1. Build the frontend:
+```bash
+cd frontend
+npm run build
+```
+
+2. Build the backend:
+```bash
+yarn build
+```
+
+3. Deploy the built assets to your preferred hosting platform.
+
+## Features
+
+### Frontend
+- 🎨 Modern UI with shadcn/ui components
+- 🌙 Dark/light theme support
+- 📱 Responsive design
+- ⚡ Real-time SQL generation with streaming
+- 🧪 Automated test runner interface
+- 📊 Test case management and filtering
+- 🔄 Live query results
+
+### Backend
+- 🚀 NestJS framework with TypeScript
+- 🤖 Ollama integration for AI-powered SQL generation
+- 🗄️ PostgreSQL with PostGIS support
+- 🧪 Automated test runner for SQL validation
+- 📡 RESTful API with streaming support
+- 🔒 CORS configuration for frontend integration
+
+## API Endpoints
+
+- `POST /generate-sql` - Generate SQL from natural language
+- `POST /generate-sql-stream` - Generate SQL with streaming response
+- `POST /api/test-runner/run` - Run automated tests
+- `GET /api/test-runner/test-cases` - Get all test cases
+
+## Environment Variables
+
+### Backend (.env)
+```env
+PG_USER=postgres
+PG_PASSWORD=postgres
+PG_DB=llm_demo
+PG_HOST=localhost
+PG_PORT=5432
+OLLAMA_HOST=http://localhost:11434
+PORT=3000
+```
+
+### Docker Compose (.env)
+```env
+PG_USER=postgres
+PG_PASSWORD=postgres
+PG_PORT=5432
+```
+
+## Development Commands
+
+### Backend
+```bash
+yarn start:dev      # Start in development mode
+yarn build          # Build for production
+yarn start:prod     # Start in production mode
+yarn test           # Run tests
+yarn lint           # Run linter
+```
+
+### Frontend
+```bash
+npm run dev         # Start development server
+npm run build       # Build for production
+npm run preview     # Preview production build
+npm run lint        # Run linter
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
