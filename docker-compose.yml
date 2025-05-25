@@ -37,7 +37,7 @@ services:
       PG_DB: llm_demo
       OLLAMA_HOST: http://host.docker.internal:11434
     ports:
-      - "3000:3000"
+      - "3003:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: >

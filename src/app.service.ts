@@ -10,7 +10,7 @@ export class AppService {
   private readonly schemaCache: Record<string, string> = {};
 
   constructor() {
-    this.ollama = new Ollama({ host: 'http://localhost:11434' });
+    this.ollama = new Ollama({ host: 'http://host.docker.internal:11434' });
     // Preload schemas
     this.loadSchemas();
   }
